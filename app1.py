@@ -59,8 +59,8 @@ st.markdown(
 # =====================================================
 @st.cache_resource
 def load_artifacts() -> Tuple[object, object, List[str], float]:
-    model_artifact = joblib.load("models/calibrated_gb_model.pkl")
-    imputer = joblib.load("models/imputer.pkl")
+    model_artifact = joblib.load("calibrated_gb_model.pkl")
+    imputer = joblib.load("calibrated_gb_model.pkl")
 
     if isinstance(model_artifact, dict):
         model = model_artifact["model"]
