@@ -90,6 +90,55 @@ def load_artifacts() -> Tuple[object, object, List[str], float]:
 
     return model, imputer, feature_names, threshold
 
+@st.cache_resource
+def load_artifacts():
+    model_artifact = joblib.load("models/calibrated_gb_model.pkl")
+    imputer_artifact = joblib.load("models/imputer.pkl")
+
+    if isinstance(model_artifact, dict):
+        model = model_artifact["model"]
+        feature_names = model_artifact["feature_names"]
+        threshold = model_artifact.get("threshold", 0.20)
+    else:
+        model = model_artifact
+        feature_names = [
+            "phq9_total",
+            "sleep_hours",
+            "short_sleep",
+            "daytime_sleepiness",
+            "med_count",
+            "polypharmacy",
+            "cns_load",
+            "psych_med_count",
+            "is_opioid",
+            "is_antidepressant",
+            "anemia",
+            "high_rdw",
+            "bmi",
+            "age",
+            "sex_male",
+            "income_ratio",
+        ]
+        threshold = 0.20
+
+    # FIX: handle imputer saved as dict
+    if isinstance(imputer_artifact, dict):
+        if "imputer" in imputer_artifact:
+            imputer = imputer_artifact["imputer"]
+        else:
+            raise ValueError("imputer.pkl loaded as dict but no 'imputer' key was found.")
+    else:
+        imputer = imputer_artifact
+
+    return model, imputer, feature_names, threshold
+    
+joblib.dump(imputer, "models/imputer.pkl")
+model_artifact = {
+    "model": calibrated_gb,
+    "feature_names": list(X.columns),
+    "threshold": 0.20,
+}
+joblib.dump(model_artifact, "models/calibrated_gb_model.pkl")
 
 # =====================================================
 # INPUT MAPPINGS
