@@ -132,13 +132,13 @@ def load_artifacts():
 
     return model, imputer, feature_names, threshold
     
-joblib.dump(imputer, "models/imputer.pkl")
+joblib.dump(imputer, "imputer.pkl")
 model_artifact = {
     "model": calibrated_gb,
     "feature_names": list(X.columns),
     "threshold": 0.20,
 }
-joblib.dump(model_artifact, "models/calibrated_gb_model.pkl")
+joblib.dump(model_artifact, "calibrated_gb_model.pkl")
 
 # =====================================================
 # INPUT MAPPINGS
