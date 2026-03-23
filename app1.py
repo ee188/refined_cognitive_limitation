@@ -92,8 +92,8 @@ def load_artifacts() -> Tuple[object, object, List[str], float]:
 
 @st.cache_resource
 def load_artifacts():
-    model_artifact = joblib.load("models/calibrated_gb_model.pkl")
-    imputer_artifact = joblib.load("models/imputer.pkl")
+    model_artifact = joblib.load("calibrated_gb_model.pkl")
+    imputer = joblib.load("calibrated_gb_model.pkl")
 
     if isinstance(model_artifact, dict):
         model = model_artifact["model"]
@@ -132,7 +132,7 @@ def load_artifacts():
 
     return model, imputer, feature_names, threshold
     
-joblib.dump(imputer_artifact, "imputer.pkl")
+joblib.dump(imputer, "imputer.pkl")
 model_artifact = {
     "model": calibrated_gb,
     "feature_names": list(X.columns),
