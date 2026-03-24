@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 from typing import Dict, List, Tuple
 
@@ -55,12 +54,11 @@ st.markdown(
 )
 
 # =====================================================
-# LOAD MODEL ARTIFACTS
+# LOAD MODEL ARTIFACT
 # =====================================================
 @st.cache_resource
-def load_artifacts() -> Tuple[object, object, List[str], float]:
+def load_artifacts() -> Tuple[object, List[str], float]:
     model_artifact = joblib.load("calibrated_gb_model.pkl")
-    imputer_artifact = joblib.load("imputer.pkl")
 
     if isinstance(model_artifact, dict):
         model = model_artifact["model"]
@@ -88,15 +86,7 @@ def load_artifacts() -> Tuple[object, object, List[str], float]:
         ]
         threshold = 0.20
 
-    if isinstance(imputer_artifact, dict):
-        if "imputer" in imputer_artifact:
-            imputer = imputer_artifact["imputer"]
-        else:
-            raise ValueError("imputer.pkl is a dict but has no 'imputer' key.")
-    else:
-        imputer = imputer_artifact
-
-    return model, imputer, feature_names, threshold
+    return model, feature_names, threshold
 
 
 # =====================================================
@@ -307,7 +297,7 @@ def plot_domain_bars(user_input: Dict[str, float]):
 # =====================================================
 # APP HEADER
 # =====================================================
-model, imputer, feature_names, threshold = load_artifacts()
+model, feature_names, threshold = load_artifacts()
 
 st.title("Cognitive Limitation Risk Calculator")
 st.write(
@@ -446,9 +436,8 @@ if submitted:
     }
 
     X_user = build_features(user_input, feature_names)
-    X_user_imp = pd.DataFrame(imputer.transform(X_user), columns=feature_names)
 
-    risk = float(model.predict_proba(X_user_imp)[:, 1][0])
+    risk = float(model.predict_proba(X_user)[:, 1][0])
     category = risk_category(risk)
     color = risk_color(risk)
     reasons = explain_domains(user_input)
