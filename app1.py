@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# STYLING
+# STYLE
 # =====================================================
 st.markdown(
     """
@@ -60,7 +60,7 @@ st.markdown(
 @st.cache_resource
 def load_artifacts() -> Tuple[object, object, List[str], float]:
     model_artifact = joblib.load("calibrated_gb_model.pkl")
-    imputer = joblib.load("calibrated_gb_model.pkl")
+    imputer_artifact = joblib.load("imputer.pkl")
 
     if isinstance(model_artifact, dict):
         model = model_artifact["model"]
@@ -88,62 +88,19 @@ def load_artifacts() -> Tuple[object, object, List[str], float]:
         ]
         threshold = 0.20
 
-    return model, imputer, feature_names, threshold
-
-@st.cache_resource
-def load_artifacts():
-    model_artifact = joblib.load("calibrated_gb_model.pkl")
-    imputer = joblib.load("calibrated_gb_model.pkl")
-
-    if isinstance(model_artifact, dict):
-        model = model_artifact["model"]
-        feature_names = model_artifact["feature_names"]
-        threshold = model_artifact.get("threshold", 0.20)
-    else:
-        model = model_artifact
-        feature_names = [
-            "phq9_total",
-            "sleep_hours",
-            "short_sleep",
-            "daytime_sleepiness",
-            "med_count",
-            "polypharmacy",
-            "cns_load",
-            "psych_med_count",
-            "is_opioid",
-            "is_antidepressant",
-            "anemia",
-            "high_rdw",
-            "bmi",
-            "age",
-            "sex_male",
-            "income_ratio",
-        ]
-        threshold = 0.20
-
-    # FIX: handle imputer saved as dict
     if isinstance(imputer_artifact, dict):
         if "imputer" in imputer_artifact:
             imputer = imputer_artifact["imputer"]
         else:
-            raise ValueError("imputer.pkl loaded as dict but no 'imputer' key was found.")
+            raise ValueError("imputer.pkl is a dict but has no 'imputer' key.")
     else:
         imputer = imputer_artifact
 
     return model, imputer, feature_names, threshold
-    
-joblib.dump(imputer, "imputer.pkl")
-model_artifact = {
-    "model": calibrated_gb,
-    "feature_names": list(X.columns),
-    "threshold": 0.20,
-}
-joblib.dump(model_artifact, "calibrated_gb_model.pkl")
+
 
 # =====================================================
 # INPUT MAPPINGS
-# IMPORTANT: THIS MATCHES TRAINING
-# sex_male = 1 if Male else 0
 # =====================================================
 PHQ_OPTIONS = {
     "Not at all": 0,
@@ -160,6 +117,8 @@ SLEEPINESS_OPTIONS = {
     "Almost always": 4,
 }
 
+# Training alignment:
+# sex_male = 1 if Male else 0
 SEX_TO_MODEL = {
     "Female": 0,
     "Male": 1,
@@ -501,6 +460,7 @@ if submitted:
         st.subheader("Estimated risk")
         st.markdown(f"<h1 style='margin-bottom:0;color:{color};'>{risk*100:.1f}%</h1>", unsafe_allow_html=True)
         st.write(f"**Risk category:** {category}")
+
         if risk >= threshold:
             st.write("This profile falls in a range associated with elevated likelihood of self-reported cognitive limitation.")
         else:
