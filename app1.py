@@ -22,7 +22,7 @@ st.markdown(
         background-color: #f6f7fb;
     }
     .block-container {
-        max-width: 980px;
+        max-width: 1100px;
         padding-top: 1.5rem;
         padding-bottom: 2rem;
     }
@@ -32,17 +32,42 @@ st.markdown(
     .card {
         background: white;
         border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 1rem 1.15rem;
+        border-radius: 18px;
+        padding: 1rem 1.2rem;
         margin-bottom: 1rem;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
     }
     .result-card {
         background: white;
         border: 1px solid #e5e7eb;
         border-radius: 18px;
         padding: 1.2rem;
-        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+        margin-bottom: 1rem;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+    }
+    .metric-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        padding: 1rem 1.1rem;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+        height: 100%;
+    }
+    .metric-label {
+        font-size: 0.9rem;
+        color: #6b7280;
+        margin-bottom: 0.2rem;
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1.1;
+    }
+    .metric-subtle {
+        font-size: 0.92rem;
+        color: #6b7280;
+        margin-top: 0.35rem;
     }
     .small-muted {
         color: #6b7280;
@@ -142,7 +167,7 @@ def risk_category(risk: float) -> str:
     if risk < 0.10:
         return "Low"
     if risk < 0.25:
-        return "Moderate"
+        return "Mildly elevated"
     if risk < 0.40:
         return "Elevated"
     return "High"
@@ -156,6 +181,20 @@ def risk_color(risk: float) -> str:
     if risk < 0.40:
         return "#f97316"
     return "#ef4444"
+
+
+def score_text(risk: float) -> str:
+    return f"{round(risk * 100):d} / 100"
+
+
+def score_explanation(risk: float) -> str:
+    if risk < 0.10:
+        return "This profile is not strongly associated with self-reported cognitive limitation in the training data."
+    if risk < 0.25:
+        return "This profile shows some features associated with self-reported cognitive limitation."
+    if risk < 0.40:
+        return "This profile shows several features that appear more often in people who reported cognitive limitation."
+    return "This profile strongly resembles higher-burden patterns seen in people who reported cognitive limitation."
 
 
 def input_help(text: str):
@@ -232,13 +271,13 @@ def explain_domains(user_input: Dict[str, float]) -> List[str]:
     phq_total = compute_phq_total(user_input)
 
     if phq_total >= 10:
-        reasons.append("higher mood symptom burden")
+        reasons.append("Higher mood symptom burden")
     if user_input["sleep_hours"] < 6:
-        reasons.append("short sleep duration")
+        reasons.append("Short sleep duration")
     if user_input["daytime_sleepiness"] >= 2:
-        reasons.append("daytime sleepiness")
+        reasons.append("Daytime sleepiness")
     if user_input["med_count"] >= 5:
-        reasons.append("polypharmacy")
+        reasons.append("Polypharmacy")
     if (
         int(user_input["is_benzo"])
         + int(user_input["is_sedative"])
@@ -247,13 +286,30 @@ def explain_domains(user_input: Dict[str, float]) -> List[str]:
         + int(user_input["is_anticonvulsant"])
         + int(user_input["is_muscle_relaxant"])
     ) >= 2:
-        reasons.append("higher central nervous system medication burden")
+        reasons.append("Higher central nervous system medication burden")
     if int(user_input["anemia"]) == 1:
-        reasons.append("anemia-related lab pattern")
+        reasons.append("Anemia-related lab pattern")
     if int(user_input["high_rdw"]) == 1:
-        reasons.append("abnormal red cell distribution width")
+        reasons.append("Abnormal red cell distribution width")
 
     return reasons[:4]
+
+
+def domain_scores(user_input: Dict[str, float]) -> Dict[str, float]:
+    phq_total = compute_phq_total(user_input)
+
+    mood = min(phq_total / 27, 1.0) * 100
+    sleep = min(((max(0, 6 - user_input["sleep_hours"])) + user_input["daytime_sleepiness"]) / 6, 1.0) * 100
+    meds = min((user_input["med_count"] / 8), 1.0) * 100
+    labs = (50 if int(user_input["anemia"]) == 1 else 0) + (25 if int(user_input["high_rdw"]) == 1 else 0)
+    labs = min(labs, 100)
+
+    return {
+        "Mood": mood,
+        "Sleep": sleep,
+        "Medications": meds,
+        "Labs": labs,
+    }
 
 
 def plot_risk_bar(risk: float):
@@ -265,7 +321,7 @@ def plot_risk_bar(risk: float):
     ax.set_xlim(0, 100)
     ax.set_yticks([])
     ax.set_xticks([0, 25, 50, 75, 100])
-    ax.set_xlabel("Estimated risk (%)")
+    ax.set_xlabel("Score on a 0–100 scale")
     for spine in ["top", "right", "left"]:
         ax.spines[spine].set_visible(False)
     st.pyplot(fig, clear_figure=True)
@@ -274,16 +330,9 @@ def plot_risk_bar(risk: float):
 def plot_domain_bars(user_input: Dict[str, float]):
     import matplotlib.pyplot as plt
 
-    phq_total = compute_phq_total(user_input)
-
-    mood = min(phq_total / 27, 1.0) * 100
-    sleep = min(((max(0, 6 - user_input["sleep_hours"])) + user_input["daytime_sleepiness"]) / 6, 1.0) * 100
-    meds = min((user_input["med_count"] / 8), 1.0) * 100
-    labs = (50 if int(user_input["anemia"]) == 1 else 0) + (25 if int(user_input["high_rdw"]) == 1 else 0)
-    labs = min(labs, 100)
-
-    labels = ["Mood", "Sleep", "Medications", "Labs"]
-    values = [mood, sleep, meds, labs]
+    scores = domain_scores(user_input)
+    labels = list(scores.keys())
+    values = list(scores.values())
 
     fig, ax = plt.subplots(figsize=(7, 3.5))
     ax.barh(labels, values)
@@ -398,7 +447,7 @@ with st.form("clinical_risk_form"):
         high_rdw = st.checkbox("Known abnormal red cell distribution width (RDW)")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    submitted = st.form_submit_button("Estimate risk", use_container_width=True)
+    submitted = st.form_submit_button("Estimate score", use_container_width=True)
 
 # =====================================================
 # RESULT
@@ -436,24 +485,49 @@ if submitted:
     }
 
     X_user = build_features(user_input, feature_names)
-
     risk = float(model.predict_proba(X_user)[:, 1][0])
+
     category = risk_category(risk)
     color = risk_color(risk)
+    score_label = score_text(risk)
+    explanation = score_explanation(risk)
     reasons = explain_domains(user_input)
 
+    # Top summary cards
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">Cognitive Limitation Score</div>', unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-value' style='color:{color};'>{score_label}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='metric-subtle'>Score on a 0–100 scale</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c2:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">Category</div>', unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-value'>{category}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='metric-subtle'>Based on calibrated model output</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c3:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">Model-estimated likelihood</div>', unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-value'>{risk*100:.1f}%</div>", unsafe_allow_html=True)
+        st.markdown("<div class='metric-subtle'>Shown as supporting context</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
     st.markdown('<div class="result-card">', unsafe_allow_html=True)
-    col_a, col_b = st.columns([1.1, 1])
+    col_a, col_b = st.columns([1.15, 1])
 
     with col_a:
-        st.subheader("Estimated risk")
-        st.markdown(f"<h1 style='margin-bottom:0;color:{color};'>{risk*100:.1f}%</h1>", unsafe_allow_html=True)
-        st.write(f"**Risk category:** {category}")
+        st.subheader("Interpretation")
+        st.write(explanation)
 
         if risk >= threshold:
             st.write("This profile falls in a range associated with elevated likelihood of self-reported cognitive limitation.")
         else:
-            st.write("This profile falls below the model's elevated-risk flag threshold.")
+            st.write("This profile falls below the model's elevated-score flag threshold.")
 
         if reasons:
             st.write("**Main contributing domains**")
@@ -467,13 +541,15 @@ if submitted:
 
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Clinical burden overview")
-    st.caption("This chart is a simple summary of input burden across major domains. It is a structured overview, not a diagnostic breakdown of the model.")
+    st.caption(
+        "This chart summarizes the relative burden across major domains based on the entered profile."
+    )
     plot_domain_bars(user_input)
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("How to interpret this result")
     st.write(
-        "A higher score means the profile is more similar to people in the training data who reported being limited by memory or confusion symptoms. This tool should be used as a structured estimate, not a diagnosis."
+        "A higher score means the entered profile is more similar to patterns seen in people who reported being limited by memory or confusion symptoms. This is a structured estimate, not a diagnosis."
     )
     st.markdown("</div>", unsafe_allow_html=True)
